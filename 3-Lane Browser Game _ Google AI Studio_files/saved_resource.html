@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<!-- saved from url=(0071)https://ais-dev-26gtbrars24kcorffwh2wk-558767204008.asia-east1.run.app/ -->
+<html lang="en" data-copygoat-attached="true"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <script type="module" src="./client"></script>
+
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Blob Dodge &amp; Dash</title>
+  <style>
+    /* Reset margins and paddings, prevent browser scrolling & selection */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0f172a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* Full-screen canvas styling */
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none; /* Prevent default touch gestures */
+    }
+  </style>
+<script src="./_aistudio-iframe.js.download"></script><script src="./html2canvas-pro@2.0.4"></script><style>.aistudio-hover-highlight { box-shadow: inset 0 0 0 0.5px white, inset 0 0 0 1.5px rgba(128,128,128,0.6) !important; }.aistudio-active-highlight { outline: 2px solid #87a9ff !important; outline-offset: -2px !important; box-shadow: 0 0 0 0.5px rgba(0,0,0,0.3), inset 0 0 0 0.5px rgba(0,0,0,0.3) !important; }.aistudio-generating-blur { filter: blur(5px) grayscale(100%) brightness(28%) !important; transition: filter 0.3s ease; }#aistudio-focus-mode-tag { position: absolute; display: none; align-items: center; gap: 4px; background: #87a9ff; border-radius: 12px; z-index: 10000; padding: 8px; color: #32302c; font-family: Inter, sans-serif; font-size: 14px; font-style: normal; font-weight: 500; line-height: 21px; pointer-events: none; }#aistudio-hover-mode-tag { position: absolute; display: none; align-items: center; gap: 4px; background: rgba(128,128,128,0.6); border-radius: 12px; z-index: 10000; padding: 8px; color: white; font-family: Inter, sans-serif; font-size: 14px; font-style: normal; font-weight: 500; line-height: 21px; pointer-events: none; }.aistudio-img-icon { display: none; vertical-align: middle; pointer-events: auto; cursor: pointer; }.aistudio-img-icon.visible { display: inline-flex; }#aistudio-focus-mode-tag .aistudio-img-icon { position: relative; width: 26px; height: 26px; background: #32302c; border-radius: 6px; margin: -4px -4px -4px 0; }#aistudio-focus-mode-tag .aistudio-img-icon::before { content: ""; position: absolute; top: 4px; left: 4px; width: 18px; height: 18px; background-color: white; -webkit-mask-image: url("https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/edit_fix_auto/default/24px.svg"); -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; mask-image: url("https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/edit_fix_auto/default/24px.svg"); mask-size: contain; mask-repeat: no-repeat; }#aistudio-hover-mode-tag .aistudio-img-icon { position: relative; width: 18px; height: 18px; margin-left: 4px; }#aistudio-hover-mode-tag .aistudio-img-icon::before { content: ""; position: absolute; top: 0; left: 0; width: 18px; height: 18px; background-color: white; -webkit-mask-image: url("https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/edit_fix_auto/default/24px.svg"); -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; mask-image: url("https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/edit_fix_auto/default/24px.svg"); mask-size: contain; mask-repeat: no-repeat; }#aistudio-focus-mode-tag .aistudio-img-icon:hover, #aistudio-hover-mode-tag .aistudio-img-icon:hover { background: #424242 !important; }#aistudio-focus-mode-tag .aistudio-img-icon:active, #aistudio-hover-mode-tag .aistudio-img-icon:active { background: #393f51 !important; }</style><link id="copygoat-styles" rel="stylesheet" type="text/css" href="chrome-extension://hnnlhgcljcbgkebncpijgeaokpkohhph/content.css"></head>
+<body>
+  <!-- Full-screen HTML5 Canvas -->
+  <canvas id="gameCanvas" width="854" height="499"></canvas>
+
+  <script>
+    // ==========================================
+    // 1. SETUP & INITIALIZATION
+    // ==========================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = 0;
+    let height = 0;
+
+    /**
+     * Resizes canvas to fill the entire window with crisp high-DPI scaling.
+     */
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      width = window.innerWidth;
+      height = window.innerHeight;
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ==========================================
+    // 2. GAME STATE & CONSTANTS
+    // ==========================================
+    const SKY_BLUE = '#38bdf8';
+
+    // Game states: 'START', 'PLAYING', 'GAMEOVER'
+    let gameState = 'START';
+    let score = 0;          // Survival time in seconds
+    let highScore = 0;
+    let gameTime = 0;       // Total seconds in current game loop
+
+    // Load persisted high score from localStorage
+    try {
+      const savedScore = localStorage.getItem('squishy_blob_highscore');
+      if (savedScore !== null) {
+        highScore = parseFloat(savedScore) || 0;
+      }
+    } catch (e) {
+      console.warn('localStorage not accessible:', e);
+    }
+
+    // Sound System (Web Audio API)
+    let audioCtx = null;
+    let isMuted = false;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+    }
+
+    // 1. Soft "whoosh" sound when dashing
+    function playDashSound() {
+      if (isMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      try {
+        const now = audioCtx.currentTime;
+        
+        // Air rush noise
+        const bufferSize = audioCtx.sampleRate * 0.12;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1100, now);
+        filter.frequency.exponentialRampToValueAtTime(180, now + 0.12);
+        filter.Q.value = 1.2;
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        noise.start(now);
+
+        // Sub glide tone
+        const osc = audioCtx.createOscillator();
+        const oscGain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(170, now);
+        osc.frequency.exponentialRampToValueAtTime(45, now + 0.12);
+
+        oscGain.gain.setValueAtTime(0.12, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc.connect(oscGain);
+        oscGain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } catch (e) {}
+    }
+
+    // 2. Quiet "pop" sound when squishing
+    function playSquishSound() {
+      if (isMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      try {
+        const now = audioCtx.currentTime;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(450, now);
+        osc.frequency.exponentialRampToValueAtTime(580, now + 0.025);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.07);
+
+        gain.gain.setValueAtTime(0.10, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.07);
+      } catch (e) {}
+    }
+
+    // 3. Subtle "swish" sound as arrows pass close (near-miss)
+    function playNearMissSound() {
+      if (isMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      try {
+        const now = audioCtx.currentTime;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(650, now);
+        osc.frequency.exponentialRampToValueAtTime(1250, now + 0.03);
+        osc.frequency.exponentialRampToValueAtTime(400, now + 0.08);
+
+        gain.gain.setValueAtTime(0.05, now); // Very subtle
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } catch (e) {}
+    }
+
+    // 4. Funny "splat" sound on game over
+    function playSplatSound() {
+      if (isMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      try {
+        const now = audioCtx.currentTime;
+
+        // Resonant cartoon squelch
+        const osc = audioCtx.createOscillator();
+        const oscGain = audioCtx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.35);
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(850, now);
+        filter.frequency.exponentialRampToValueAtTime(100, now + 0.35);
+        filter.Q.value = 5.5;
+
+        oscGain.gain.setValueAtTime(0.28, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+        osc.connect(filter);
+        filter.connect(oscGain);
+        oscGain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.35);
+
+        // Noise splat burst
+        const bufferSize = audioCtx.sampleRate * 0.22;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(0.22, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+        const noiseFilter = audioCtx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(1000, now);
+        noiseFilter.frequency.exponentialRampToValueAtTime(140, now + 0.22);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+
+        noise.start(now);
+      } catch (e) {}
+    }
+
+    // Screen Shake Effect
+    let screenShakeTimer = 0;
+    let screenShakeMaxTime = 1.0;
+    let screenShakeIntensity = 0;
+
+    function triggerScreenShake(duration = 1.0, intensity = 14) {
+      screenShakeTimer = duration;
+      screenShakeMaxTime = duration;
+      screenShakeIntensity = intensity;
+
+      // Haptic vibration on mobile devices (short 200ms pattern, stops automatically)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try {
+          navigator.vibrate(200);
+        } catch (e) {}
+      }
+    }
+
+    // Player Blob Object
+    const player = {
+      x: 0,
+      y: 0,
+      radius: 28,           // Base visual radius
+      color: '#ec4899',     // Vibrant pink
+      
+      // Movement
+      speed: 340,           // Pixels per second
+      vx: 0,
+      vy: 0,
+      lastDirX: 1,          // Facing direction vector X
+      lastDirY: 0,          // Facing direction vector Y
+
+      // Dash mechanism
+      isDashing: false,
+      dashTimer: 0,         // Active dash time remaining
+      dashDuration: 0.15,   // Dash length in seconds
+      dashSpeed: 950,       // Burst speed during dash
+      dashCooldown: 0,      // Time left until dash is ready
+      dashCooldownMax: 1.0, // 1 second cooldown
+      dashTrail: [],        // Trail ghosts saved for visual effect
+
+      // Squish mechanism
+      isSquished: false,    // Active squish state
+      scaleX: 1.0,          // Horizontal visual scale
+      scaleY: 1.0,          // Vertical visual scale
+      velX: 0.0,            // Spring velocity X
+      velY: 0.0,            // Spring velocity Y
+    };
+
+    // Obstacles & Effects
+    let arrows = [];
+    let spawnTimer = 0;
+    let burstTimer = 0;      // 5-second interval timer for burst arrow groups
+    let spawnInterval = 0.8; // Seconds between arrow spawns (decreases with time)
+    let particles = [];      // Explosions / burst visual effects
+
+    // Touch & Mobile Controls State
+    const touchInput = {
+      joystickActive: false,
+      joystickId: null,
+      startX: 0,
+      startY: 0,
+      currX: 0,
+      currY: 0,
+      moveVecX: 0,
+      moveVecY: 0,
+      
+      // Touch buttons
+      dashButtonTouchId: null,
+      squishButtonTouchId: null,
+      isSquishTouched: false
+    };
+
+    // Keyboard Key States
+    const keys = {
+      Up: false,
+      Down: false,
+      Left: false,
+      Right: false,
+      SquishKey: false,
+      DashKey: false
+    };
+
+    // ==========================================
+    // 3. INPUT HANDLING
+    // ==========================================
+
+    // Keyboard listeners
+    window.addEventListener('keydown', (e) => {
+      // Start or restart game on space / enter / any key if at start or game over
+      if (gameState !== 'PLAYING') {
+        if (e.code === 'Space' || e.key === 'Enter') {
+          startGame();
+          return;
+        }
+      }
+
+      switch (e.code) {
+        case 'KeyW':
+        case 'ArrowUp':
+          keys.Up = true;
+          break;
+        case 'KeyS':
+        case 'ArrowDown':
+          keys.Down = true;
+          break;
+        case 'KeyA':
+        case 'ArrowLeft':
+          keys.Left = true;
+          break;
+        case 'KeyD':
+        case 'ArrowRight':
+          keys.Right = true;
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+        case 'KeyC':
+          keys.SquishKey = true;
+          break;
+        case 'KeyM':
+          toggleMute();
+          break;
+        case 'Space':
+          // Tap space triggers dash in playing mode
+          if (!keys.DashKey) {
+            triggerDash();
+            keys.DashKey = true;
+          }
+          e.preventDefault();
+          break;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      switch (e.code) {
+        case 'KeyW':
+        case 'ArrowUp':
+          keys.Up = false;
+          break;
+        case 'KeyS':
+        case 'ArrowDown':
+          keys.Down = false;
+          break;
+        case 'KeyA':
+        case 'ArrowLeft':
+          keys.Left = false;
+          break;
+        case 'KeyD':
+        case 'ArrowRight':
+          keys.Right = false;
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+        case 'KeyC':
+          keys.SquishKey = false;
+          break;
+        case 'Space':
+          keys.DashKey = false;
+          break;
+      }
+    });
+
+    /**
+     * Triggers the burst dash if off cooldown
+     */
+    function triggerDash() {
+      if (gameState !== 'PLAYING') return;
+      if (player.dashCooldown <= 0 && !player.isDashing) {
+        player.isDashing = true;
+        player.dashTimer = player.dashDuration;
+        player.dashCooldown = player.dashCooldownMax;
+
+        playDashSound();
+
+        // Flash & particles burst
+        createDashParticles(player.x, player.y);
+      }
+    }
+
+    // Touch / Pointer controls setup
+    canvas.addEventListener('pointerdown', (e) => {
+      // Top right Mute toggle check (covers full mute badge text & icon area)
+      if (e.clientX >= width - 180 && e.clientX <= width && e.clientY >= 0 && e.clientY <= 65) {
+        toggleMute();
+        return;
+      }
+
+      if (gameState !== 'PLAYING') {
+        startGame();
+        return;
+      }
+
+      // Check on-screen UI buttons for mobile (Right side buttons)
+      const btnSize = 65;
+      const dashBtnX = width - 80;
+      const dashBtnY = height - 150;
+      const squishBtnX = width - 80;
+      const squishBtnY = height - 65;
+
+      const distDash = Math.hypot(e.clientX - dashBtnX, e.clientY - dashBtnY);
+      const distSquish = Math.hypot(e.clientX - squishBtnX, e.clientY - squishBtnY);
+
+      if (distDash < btnSize) {
+        touchInput.dashButtonTouchId = e.pointerId;
+        triggerDash();
+        return;
+      }
+
+      if (distSquish < btnSize) {
+        touchInput.squishButtonTouchId = e.pointerId;
+        touchInput.isSquishTouched = true;
+        return;
+      }
+
+      // If touched left half of screen or empty area, initialize virtual joystick
+      if (!touchInput.joystickActive && e.clientX < width * 0.7) {
+        touchInput.joystickActive = true;
+        touchInput.joystickId = e.pointerId;
+        touchInput.startX = e.clientX;
+        touchInput.startY = e.clientY;
+        touchInput.currX = e.clientX;
+        touchInput.currY = e.clientY;
+        touchInput.moveVecX = 0;
+        touchInput.moveVecY = 0;
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (touchInput.joystickActive && e.pointerId === touchInput.joystickId) {
+        touchInput.currX = e.clientX;
+        touchInput.currY = e.clientY;
+
+        const maxRadius = 55;
+        const dx = touchInput.currX - touchInput.startX;
+        const dy = touchInput.currY - touchInput.startY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist === 0) {
+          touchInput.moveVecX = 0;
+          touchInput.moveVecY = 0;
+        } else {
+          const norm = Math.min(dist, maxRadius) / maxRadius;
+          touchInput.moveVecX = (dx / dist) * norm;
+          touchInput.moveVecY = (dy / dist) * norm;
+        }
+      }
+    });
+
+    function handlePointerUp(e) {
+      if (e.pointerId === touchInput.joystickId) {
+        touchInput.joystickActive = false;
+        touchInput.joystickId = null;
+        touchInput.moveVecX = 0;
+        touchInput.moveVecY = 0;
+      }
+      if (e.pointerId === touchInput.squishButtonTouchId) {
+        touchInput.squishButtonTouchId = null;
+        touchInput.isSquishTouched = false;
+      }
+      if (e.pointerId === touchInput.dashButtonTouchId) {
+        touchInput.dashButtonTouchId = null;
+      }
+    }
+
+    canvas.addEventListener('pointerup', handlePointerUp);
+    canvas.addEventListener('pointercancel', handlePointerUp);
+
+    // ==========================================
+    // 4. GAME LOGIC & UPDATES
+    // ==========================================
+
+    /**
+     * Initializes or resets the game loop
+     */
+    function startGame() {
+      gameState = 'PLAYING';
+      score = 0;
+      gameTime = 0;
+      spawnTimer = 0;
+      burstTimer = 0;
+      spawnInterval = 1.15;
+      screenShakeTimer = 0;
+
+      const screenDiag = Math.hypot(width, height);
+      player.x = width / 2;
+      player.y = height / 2;
+      player.radius = Math.max(18, Math.min(38, screenDiag * 0.028));
+      player.speed = screenDiag * 0.36;
+      player.dashSpeed = screenDiag * 1.00;
+      player.vx = 0;
+      player.vy = 0;
+      player.lastDirX = 1;
+      player.lastDirY = 0;
+      player.isDashing = false;
+      player.dashTimer = 0;
+      player.dashCooldown = 0;
+      player.dashTrail = [];
+      player.isSquished = false;
+      player.scaleX = 1.0;
+      player.scaleY = 1.0;
+
+      arrows = [];
+      particles = [];
+    }
+
+    /**
+     * Main update routine per frame
+     */
+    function update(dt) {
+      if (gameState !== 'PLAYING') return;
+
+      const screenDiag = Math.hypot(width, height);
+      const screenScale = screenDiag / 1000;
+
+      // Scale player speed and radius dynamically (handles screen resize/rotation seamlessly)
+      player.radius = Math.max(18, Math.min(38, screenDiag * 0.028));
+      player.speed = screenDiag * 0.36;
+      player.dashSpeed = screenDiag * 1.00;
+
+      gameTime += dt;
+      score = Math.floor(gameTime * 10) / 10; // Survival score
+
+      // Progressive difficulty curve: spawn interval smoothly decreases over time
+      // Starts at ~1.15s (easy first 20s), ramps down gradually to ~0.22s
+      spawnInterval = Math.max(0.22, 1.15 / (1 + gameTime * 0.028));
+
+      // Update Squish State
+      const wasSquished = player.isSquished;
+      player.isSquished = keys.SquishKey || touchInput.isSquishTouched;
+      if (!wasSquished && player.isSquished) {
+        playSquishSound();
+      }
+
+      // Update Dash Cooldown
+      if (player.dashCooldown > 0) {
+        player.dashCooldown -= dt;
+        if (player.dashCooldown < 0) player.dashCooldown = 0;
+      }
+
+      // ----------------------------------------
+      // Movement Input Processing
+      // ----------------------------------------
+      let inputX = 0;
+      let inputY = 0;
+
+      if (keys.Left) inputX -= 1;
+      if (keys.Right) inputX += 1;
+      if (keys.Up) inputY -= 1;
+      if (keys.Down) inputY += 1;
+
+      // Add touch joystick input vector
+      inputX += touchInput.moveVecX;
+      inputY += touchInput.moveVecY;
+
+      // Normalize movement direction vector
+      const inputLen = Math.hypot(inputX, inputY);
+      if (inputLen > 0) {
+        inputX /= Math.max(1, inputLen);
+        inputY /= Math.max(1, inputLen);
+        player.lastDirX = inputX;
+        player.lastDirY = inputY;
+      }
+
+      // Handle Dash Burst vs Normal Speed
+      let currentSpeed = player.speed;
+
+      if (player.isDashing) {
+        player.dashTimer -= dt;
+        currentSpeed = player.dashSpeed;
+
+        // Save trail ghost for dash effect
+        player.dashTrail.push({
+          x: player.x,
+          y: player.y,
+          alpha: 0.8,
+          scaleX: player.scaleX,
+          scaleY: player.scaleY
+        });
+
+        if (player.dashTimer <= 0) {
+          player.isDashing = false;
+        }
+      }
+
+      // Determine movement direction: if dashing without active input, dash in last facing direction
+      let moveDirX = inputX;
+      let moveDirY = inputY;
+      if (player.isDashing && inputLen === 0) {
+        moveDirX = player.lastDirX;
+        moveDirY = player.lastDirY;
+      }
+
+      // Apply movement
+      player.x += moveDirX * currentSpeed * dt;
+      player.y += moveDirY * currentSpeed * dt;
+
+      // Clamp player within screen bounds
+      const effectiveR = player.radius;
+      player.x = Math.max(effectiveR, Math.min(width - effectiveR, player.x));
+      player.y = Math.max(effectiveR, Math.min(height - effectiveR, player.y));
+
+      // ----------------------------------------
+      // Squish & Spring Physics
+      // ----------------------------------------
+      const targetScaleX = player.isSquished ? 1.45 : 1.0;
+      const targetScaleY = player.isSquished ? 0.55 : 1.0;
+
+      const stiffness = 240;
+      const damping = 15;
+
+      const forceX = (targetScaleX - player.scaleX) * stiffness;
+      player.velX = (player.velX + forceX * dt) * Math.exp(-damping * dt);
+      player.scaleX += player.velX * dt;
+
+      const forceY = (targetScaleY - player.scaleY) * stiffness;
+      player.velY = (player.velY + forceY * dt) * Math.exp(-damping * dt);
+      player.scaleY += player.velY * dt;
+
+      // Fade out dash ghosts
+      for (let i = player.dashTrail.length - 1; i >= 0; i--) {
+        player.dashTrail[i].alpha -= dt * 4;
+        if (player.dashTrail[i].alpha <= 0) {
+          player.dashTrail.splice(i, 1);
+        }
+      }
+
+      // ----------------------------------------
+      // Arrow Projectile Spawning & Updates
+      // ----------------------------------------
+      spawnTimer += dt;
+      if (spawnTimer >= spawnInterval) {
+        spawnTimer = 0;
+        spawnArrowSystem();
+      }
+
+      // Every 5 seconds: trigger a burst group of 3 fast arrows from a random direction
+      burstTimer += dt;
+      if (burstTimer >= 5.0) {
+        burstTimer -= 5.0;
+        spawnBurstGroup();
+      }
+
+      // Update arrows & collision checks
+      // Squishing flattens blob and shrinks effective collision hitbox
+      const effectiveHitboxRadius = player.isSquished ? player.radius * 0.52 : player.radius * 0.85;
+
+      for (let i = arrows.length - 1; i >= 0; i--) {
+        const arrow = arrows[i];
+        arrow.x += arrow.vx * dt;
+        arrow.y += arrow.vy * dt;
+
+        // Despawn once out of screen bounds
+        const despawnMargin = Math.max(60, screenDiag * 0.08);
+        if (
+          arrow.x < -despawnMargin ||
+          arrow.x > width + despawnMargin ||
+          arrow.y < -despawnMargin ||
+          arrow.y > height + despawnMargin
+        ) {
+          arrows.splice(i, 1);
+          continue;
+        }
+
+        // Collision detection: Arrow center vs player hitbox
+        const dist = Math.hypot(arrow.x - player.x, arrow.y - player.y);
+        const nearMissDist = effectiveHitboxRadius + arrow.hitboxRadius + (38 * screenScale);
+
+        if (dist < effectiveHitboxRadius + arrow.hitboxRadius) {
+          // Trigger death / Game Over
+          triggerScreenShake(1.0, 15);
+          playSplatSound();
+          createDeathExplosion(player.x, player.y);
+          if (score > highScore) {
+            highScore = score;
+            try {
+              localStorage.setItem('squishy_blob_highscore', highScore.toString());
+            } catch (e) {}
+          }
+          gameState = 'GAMEOVER';
+          break;
+        } else if (!arrow.hasTriggeredNearMiss && dist < nearMissDist) {
+          arrow.hasTriggeredNearMiss = true;
+          playNearMissSound();
+        }
+      }
+
+      // Update particle effects
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    /**
+     * Generates a random spawn point along the full outer perimeter of the screen (360 degrees, including corners)
+     */
+    function getRandomPerimeterPoint(margin) {
+      if (margin === undefined) {
+        const screenDiag = Math.hypot(width, height);
+        margin = Math.max(20, screenDiag * 0.04);
+      }
+      const w = width + margin * 2;
+      const h = height + margin * 2;
+      const totalPerimeter = 2 * w + 2 * h;
+      const p = Math.random() * totalPerimeter;
+
+      if (p < w) {
+        // Top edge (including corners)
+        return { x: -margin + p, y: -margin };
+      } else if (p < w + h) {
+        // Right edge (including corners)
+        return { x: width + margin, y: -margin + (p - w) };
+      } else if (p < 2 * w + h) {
+        // Bottom edge (including corners)
+        return { x: width + margin - (p - (w + h)), y: height + margin };
+      } else {
+        // Left edge (including corners)
+        return { x: -margin, y: height + margin - (p - (2 * w + h)) };
+      }
+    }
+
+    /**
+     * Spawns arrow projectile(s) based on current game time and difficulty curve
+     */
+    function spawnArrowSystem() {
+      const screenDiag = Math.hypot(width, height);
+      // Arrow speed as a fraction of screen diagonal per second (starts at 0.25, ramps up to 0.65)
+      // This guarantees equal time-to-target (~2 seconds initially) across mobile and desktop
+      const speedFraction = Math.min(0.65, 0.25 + gameTime * 0.0035);
+      const currentSpeed = screenDiag * speedFraction;
+
+      // Determine how many distinct directions to spawn from simultaneously
+      let numSpawns = 1;
+      if (gameTime >= 90) {
+        const r = Math.random();
+        numSpawns = r < 0.15 ? 1 : (r < 0.80 ? 2 : 3);
+      } else if (gameTime >= 50) {
+        numSpawns = Math.random() < 0.65 ? 2 : 1;
+      } else if (gameTime >= 22) { // After 20-30s: start occasionally spawning from 2 directions at once
+        numSpawns = Math.random() < 0.40 ? 2 : 1;
+      }
+
+      for (let i = 0; i < numSpawns; i++) {
+        // After ~60 seconds (55s+), introduce targeted arrows
+        let isTargeted = false;
+        if (gameTime >= 55) {
+          const targetChance = gameTime >= 85 ? 0.50 : 0.35;
+          isTargeted = Math.random() < targetChance;
+        }
+
+        spawnSingleArrow(currentSpeed, isTargeted);
+      }
+    }
+
+    /**
+     * Spawns a single arrow from a random point along the 360-degree perimeter
+     */
+    function spawnSingleArrow(baseSpeed, isTargeted) {
+      const screenDiag = Math.hypot(width, height);
+      const screenScale = screenDiag / 1000;
+      const margin = Math.max(20, screenDiag * 0.04);
+      const origin = getRandomPerimeterPoint(margin);
+
+      let targetX, targetY;
+
+      if (isTargeted) {
+        // Targeted arrow: angles directly toward blob's position at spawn moment
+        targetX = player.x;
+        targetY = player.y;
+      } else {
+        // Standard arrow: aims generally across the screen with variance proportional to screen size
+        targetX = player.x + (Math.random() - 0.5) * (280 * screenScale);
+        targetY = player.y + (Math.random() - 0.5) * (280 * screenScale);
+      }
+
+      const angle = Math.atan2(targetY - origin.y, targetX - origin.x);
+      const speed = isTargeted ? baseSpeed * 1.15 : baseSpeed;
+
+      arrows.push({
+        x: origin.x,
+        y: origin.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        angle: angle,
+        length: (isTargeted ? 30 : 26) * screenScale,
+        width: (isTargeted ? 16 : 14) * screenScale,
+        hitboxRadius: (isTargeted ? 9 : 8) * screenScale,
+        isTargeted: isTargeted,
+        isBurst: false,
+        color: isTargeted ? '#ef4444' : '#f59e0b', // Red for targeted, Amber for standard
+        hasTriggeredNearMiss: false
+      });
+    }
+
+    /**
+     * Spawns a burst group of 3 fast purple arrows stuck tightly together in a side-by-side cluster
+     */
+    function spawnBurstGroup() {
+      const screenDiag = Math.hypot(width, height);
+      const screenScale = screenDiag / 1000;
+
+      const speedFraction = Math.min(0.70, 0.28 + gameTime * 0.0038);
+      const burstSpeed = screenDiag * speedFraction * 1.35; // Faster burst speed
+
+      // Pick an unpredictable origin anywhere along the perimeter
+      const margin = Math.max(20, screenDiag * 0.045);
+      const origin = getRandomPerimeterPoint(margin);
+
+      // Aim towards player position
+      const targetX = player.x + (Math.random() - 0.5) * (50 * screenScale);
+      const targetY = player.y + (Math.random() - 0.5) * (50 * screenScale);
+      const baseAngle = Math.atan2(targetY - origin.y, targetX - origin.x);
+
+      // Perpendicular vector for tight side-by-side cluster spacing
+      const perpX = -Math.sin(baseAngle);
+      const perpY = Math.cos(baseAngle);
+
+      // 3 arrows stuck tightly together side-by-side (scaled spacing)
+      const offsetSpacing = 18 * screenScale;
+      const offsets = [-offsetSpacing, 0, offsetSpacing];
+
+      for (const offset of offsets) {
+        arrows.push({
+          x: origin.x + perpX * offset,
+          y: origin.y + perpY * offset,
+          vx: Math.cos(baseAngle) * burstSpeed,
+          vy: Math.sin(baseAngle) * burstSpeed,
+          angle: baseAngle,
+          length: 30 * screenScale,
+          width: 16 * screenScale,
+          hitboxRadius: 8.5 * screenScale,
+          isTargeted: false,
+          isBurst: true,
+          color: '#c084fc', // Vibrant purple for 5-sec burst arrows
+          hasTriggeredNearMiss: false
+        });
+      }
+
+      // Origin spawn particle effect
+      const safeParticleX = Math.max(10, Math.min(width - 10, origin.x));
+      const safeParticleY = Math.max(10, Math.min(height - 10, origin.y));
+      for (let i = 0; i < 10; i++) {
+        const pAngle = baseAngle + (Math.random() - 0.5) * 0.6;
+        const spd = screenDiag * (0.12 + Math.random() * 0.16);
+        particles.push({
+          x: safeParticleX,
+          y: safeParticleY,
+          vx: Math.cos(pAngle) * spd,
+          vy: Math.sin(pAngle) * spd,
+          color: '#c084fc',
+          size: (3 + Math.random() * 3) * screenScale,
+          life: 0.35
+        });
+      }
+    }
+
+    /**
+     * Creates particle burst when dashing
+     */
+    function createDashParticles(x, y) {
+      const screenDiag = Math.hypot(width, height);
+      const screenScale = screenDiag / 1000;
+      for (let i = 0; i < 12; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const spd = screenDiag * (0.12 + Math.random() * 0.18);
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          color: '#f472b6',
+          size: (3 + Math.random() * 4) * screenScale,
+          life: 0.25
+        });
+      }
+    }
+
+    /**
+     * Creates particle explosion when blob collides
+     */
+    function createDeathExplosion(x, y) {
+      const screenDiag = Math.hypot(width, height);
+      const screenScale = screenDiag / 1000;
+      for (let i = 0; i < 30; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const spd = screenDiag * (0.10 + Math.random() * 0.30);
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          color: Math.random() > 0.5 ? '#ec4899' : '#ffffff',
+          size: (4 + Math.random() * 6) * screenScale,
+          life: 0.5
+        });
+      }
+    }
+
+    // ==========================================
+    // 5. DRAWING & RENDERING
+    // ==========================================
+
+    function draw() {
+      ctx.save();
+
+      // Screen Shake offset when player takes hit
+      if (screenShakeTimer > 0) {
+        const factor = Math.max(0, screenShakeTimer / screenShakeMaxTime);
+        const rx = (Math.random() - 0.5) * screenShakeIntensity * factor;
+        const ry = (Math.random() - 0.5) * screenShakeIntensity * factor;
+        ctx.translate(rx, ry);
+      }
+
+      // Clear background
+      ctx.fillStyle = SKY_BLUE;
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw subtle grid lines for depth
+      drawGrid();
+
+      // Draw particles
+      drawParticles();
+
+      // Draw Arrow Obstacles
+      drawArrows();
+
+      // Draw Player & Trail
+      if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
+        drawPlayerTrail();
+        drawPlayer();
+      }
+
+      // Draw Mobile Touch Controls & Virtual Joystick
+      drawTouchControls();
+
+      // Draw HUD (Score, Dash Cooldown, Best)
+      drawHUD();
+
+      // Draw Overlays (Title Screen / Game Over)
+      if (gameState === 'START') {
+        drawStartOverlay();
+      } else if (gameState === 'GAMEOVER') {
+        drawGameOverOverlay();
+      }
+
+      ctx.restore();
+    }
+
+    function drawGrid() {
+      const gridSize = 60;
+
+      // Subtle arena grid lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= width; x += gridSize) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+      }
+      for (let y = 0; y <= height; y += gridSize) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+      }
+      ctx.stroke();
+
+      // Grid Intersection Dots
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+      for (let x = 0; x <= width; x += gridSize) {
+        for (let y = 0; y <= height; y += gridSize) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Center Arena Circle
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(width / 2, height / 2, Math.min(width, height) * 0.2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(width / 2, height / 2, 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.fill();
+
+      // Inner Arena Perimeter Border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 2;
+      const pad = 12;
+      ctx.strokeRect(pad, pad, width - pad * 2, height - pad * 2);
+    }
+
+    function drawPlayerTrail() {
+      for (const ghost of player.dashTrail) {
+        ctx.save();
+        ctx.translate(ghost.x, ghost.y);
+        ctx.scale(ghost.scaleX, ghost.scaleY);
+
+        // Faint glowing outer aura
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius * 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(244, 114, 182, ${ghost.alpha * 0.25})`;
+        ctx.fill();
+
+        // Inner ghost body
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(236, 72, 153, ${ghost.alpha * 0.45})`;
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+
+    function drawPlayer() {
+      const r = player.radius;
+
+      ctx.save();
+      // Anchor transformation to bottom-center of blob
+      const anchorY = player.y + r;
+      ctx.translate(player.x, anchorY);
+      ctx.scale(player.scaleX, player.scaleY);
+      ctx.translate(-player.x, -anchorY);
+
+      // Shadow
+      ctx.beginPath();
+      ctx.ellipse(player.x, player.y + r * 0.7, r * 0.85, r * 0.25, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+      ctx.fill();
+
+      // Hitbox visual highlight indicator when squished
+      if (player.isSquished) {
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, r * 0.52, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fill();
+      }
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = player.color;
+      ctx.fill();
+
+      // Shine
+      ctx.beginPath();
+      ctx.arc(player.x - r * 0.3, player.y - r * 0.3, r * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.fill();
+
+      // Facial Expressions Logic
+      const lookOffset = r * 0.2;
+      const eyeOffsetX = r * 0.35 + player.lastDirX * lookOffset;
+      const eyeOffsetY = -r * 0.1 + player.lastDirY * lookOffset;
+      const lx = player.x - eyeOffsetX * 0.6;
+      const rx = player.x + eyeOffsetX * 0.6;
+      const ey = player.y + eyeOffsetY;
+      const eyeRadius = r * 0.15;
+
+      if (gameState === 'GAMEOVER') {
+        // 1. Dizzy / X-Eyes face on game over
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 3;
+        
+        // Left eye 'X'
+        ctx.beginPath();
+        ctx.moveTo(lx - 5, ey - 5); ctx.lineTo(lx + 5, ey + 5);
+        ctx.moveTo(lx - 5, ey + 5); ctx.lineTo(lx + 5, ey - 5);
+        ctx.stroke();
+
+        // Right eye 'X'
+        ctx.beginPath();
+        ctx.moveTo(rx - 5, ey - 5); ctx.lineTo(rx + 5, ey + 5);
+        ctx.moveTo(rx - 5, ey + 5); ctx.lineTo(rx + 5, ey - 5);
+        ctx.stroke();
+
+        // Dizzy open mouth
+        ctx.beginPath();
+        ctx.arc(player.x, ey + 10, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#1e293b';
+        ctx.fill();
+
+      } else if (player.isDashing) {
+        // 2. Alert / Focused face while dashing
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.ellipse(lx, ey, eyeRadius * 1.25, eyeRadius * 0.65, Math.PI * 0.15, 0, Math.PI * 2);
+        ctx.ellipse(rx, ey, eyeRadius * 1.25, eyeRadius * 0.65, -Math.PI * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(lx - 1, ey - 1, eyeRadius * 0.35, 0, Math.PI * 2);
+        ctx.arc(rx - 1, ey - 1, eyeRadius * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Determined open smile
+        ctx.beginPath();
+        ctx.arc(player.x, ey + 7, 5.5, 0, Math.PI, false);
+        ctx.fillStyle = '#1e293b';
+        ctx.fill();
+
+      } else if (player.isSquished) {
+        // 3. Squished face while flattened
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2.5;
+
+        // Happy squishy arc eyes ^ ^
+        ctx.beginPath();
+        ctx.arc(lx, ey + 3, 4.5, Math.PI * 1.1, Math.PI * 1.9);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(rx, ey + 3, 4.5, Math.PI * 1.1, Math.PI * 1.9);
+        ctx.stroke();
+
+        // Cute 'w' mouth
+        ctx.beginPath();
+        ctx.arc(player.x - 2.5, ey + 7, 2.5, 0, Math.PI);
+        ctx.arc(player.x + 2.5, ey + 7, 2.5, 0, Math.PI);
+        ctx.stroke();
+
+      } else {
+        // 4. Normal face while idle
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(lx, ey, eyeRadius, 0, Math.PI * 2);
+        ctx.arc(rx, ey, eyeRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(lx - 1, ey - 1, eyeRadius * 0.4, 0, Math.PI * 2);
+        ctx.arc(rx - 1, ey - 1, eyeRadius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Gentle smile
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(player.x, ey + 5, 4, 0.2, Math.PI - 0.2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawArrows() {
+      for (const arrow of arrows) {
+        ctx.save();
+        ctx.translate(arrow.x, arrow.y);
+        ctx.rotate(arrow.angle);
+
+        if (arrow.isBurst) {
+          ctx.shadowColor = '#c084fc';
+          ctx.shadowBlur = 12;
+        } else if (arrow.isTargeted) {
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 10;
+        }
+
+        // Arrow body triangle shape
+        ctx.beginPath();
+        ctx.moveTo(arrow.length / 2, 0); // Tip
+        ctx.lineTo(-arrow.length / 2, -arrow.width / 2);
+        ctx.lineTo(-arrow.length / 3, 0); // Notch
+        ctx.lineTo(-arrow.length / 2, arrow.width / 2);
+        ctx.closePath();
+
+        ctx.fillStyle = arrow.color;
+        ctx.fill();
+
+        ctx.strokeStyle = arrow.isBurst ? '#f5d0fe' : (arrow.isTargeted ? '#fef08a' : '#ffffff');
+        ctx.lineWidth = arrow.isBurst ? 2.2 : (arrow.isTargeted ? 2.0 : 1.5);
+        ctx.stroke();
+
+        // Inner glowing core dot for targeted sniper arrows and burst arrows
+        if (arrow.isTargeted || arrow.isBurst) {
+          ctx.shadowBlur = 0;
+          ctx.beginPath();
+          ctx.arc(-arrow.length * 0.05, 0, 3, 0, Math.PI * 2);
+          ctx.fillStyle = arrow.isBurst ? '#f5d0fe' : '#fef08a';
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    function drawParticles() {
+      for (const p of particles) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      }
+    }
+
+    function drawTouchControls() {
+      if (gameState !== 'PLAYING') return;
+
+      // Draw Virtual Joystick if active
+      if (touchInput.joystickActive) {
+        ctx.save();
+        // Base ring
+        ctx.beginPath();
+        ctx.arc(touchInput.startX, touchInput.startY, 55, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Stick handle
+        ctx.beginPath();
+        ctx.arc(
+          touchInput.startX + touchInput.moveVecX * 55,
+          touchInput.startY + touchInput.moveVecY * 55,
+          24,
+          0,
+          Math.PI * 2
+        );
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Mobile Touch Action Buttons on right side
+      const dashBtnX = width - 80;
+      const dashBtnY = height - 150;
+      const squishBtnX = width - 80;
+      const squishBtnY = height - 65;
+      const btnR = 32;
+
+      // Dash Button
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(dashBtnX, dashBtnY, btnR, 0, Math.PI * 2);
+      ctx.fillStyle = player.dashCooldown <= 0 ? 'rgba(236, 72, 153, 0.7)' : 'rgba(100, 116, 139, 0.4)';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('DASH', dashBtnX, dashBtnY);
+
+      // Squish Button
+      ctx.beginPath();
+      ctx.arc(squishBtnX, squishBtnY, btnR, 0, Math.PI * 2);
+      ctx.fillStyle = player.isSquished ? 'rgba(59, 130, 246, 0.85)' : 'rgba(255, 255, 255, 0.3)';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillText('SQUISH', squishBtnX, squishBtnY);
+      ctx.restore();
+    }
+
+    function drawHUD() {
+      if (gameState !== 'PLAYING') return;
+
+      // Score counter
+      ctx.save();
+      ctx.font = '900 28px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.fillText(`TIME: ${score.toFixed(1)}s`, 20, 42);
+
+      // Sound Mute Button (Top Right)
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = isMuted ? '#f87171' : '#4ade80';
+      ctx.fillText(isMuted ? '🔇 MUTED (M)' : '🔊 SOUND ON (M)', width - 20, 35);
+
+      // Dash Cooldown Meter
+      const meterX = 20;
+      const meterY = 56;
+      const meterW = 120;
+      const meterH = 10;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillRect(meterX, meterY, meterW, meterH);
+
+      const cooldownRatio = 1 - player.dashCooldown / player.dashCooldownMax;
+      ctx.fillStyle = cooldownRatio >= 1 ? '#ec4899' : '#38bdf8';
+      ctx.fillRect(meterX, meterY, meterW * cooldownRatio, meterH);
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(meterX, meterY, meterW, meterH);
+
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(cooldownRatio >= 1 ? 'DASH READY (Space)' : 'DASH RECHARGING', meterX, meterY + 22);
+
+      ctx.restore();
+    }
+
+    function drawStartOverlay() {
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
+      ctx.fillRect(0, 0, width, height);
+
+      const fontSize = Math.max(28, Math.min(width * 0.08, 60));
+      ctx.font = `900 ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('BLOB DODGE & DASH', width / 2, height / 2 - 50);
+
+      const subFontSize = Math.max(14, Math.min(width * 0.035, 22));
+      ctx.font = `600 ${subFontSize}px sans-serif`;
+      ctx.fillStyle = '#f472b6';
+      ctx.fillText('Dodge incoming arrows and survive as long as possible!', width / 2, height / 2 + 10);
+
+      ctx.font = `500 ${subFontSize - 2}px sans-serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('Desktop: WASD / Arrows to Move  •  Space to Dash  •  Shift / C to Squish', width / 2, height / 2 + 50);
+      ctx.fillText('Mobile: Drag to Move  •  Tap Action Buttons', width / 2, height / 2 + 75);
+
+      ctx.font = `bold ${subFontSize}px sans-serif`;
+      ctx.fillStyle = '#fef08a';
+      ctx.fillText('CLICK OR PRESS SPACE TO START', width / 2, height / 2 + 130);
+      ctx.restore();
+    }
+
+    function drawGameOverOverlay() {
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+      ctx.fillRect(0, 0, width, height);
+
+      const fontSize = Math.max(32, Math.min(width * 0.09, 64));
+      ctx.font = `900 ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = '#ef4444'; // Red game over title
+      ctx.fillText('GAME OVER', width / 2, height / 2 - 60);
+
+      const subFontSize = Math.max(16, Math.min(width * 0.04, 26));
+      ctx.font = `700 ${subFontSize}px sans-serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`SURVIVED: ${score.toFixed(1)}s`, width / 2, height / 2);
+
+      ctx.fillStyle = '#fef08a';
+      ctx.fillText(`BEST TIME: ${highScore.toFixed(1)}s`, width / 2, height / 2 + 40);
+
+      ctx.font = `bold ${subFontSize}px sans-serif`;
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText('TAP OR PRESS SPACE TO RETRY INSTANTLY', width / 2, height / 2 + 110);
+      ctx.restore();
+    }
+
+    // ==========================================
+    // 6. MAIN GAME LOOP
+    // ==========================================
+    let lastTime = 0;
+
+    function gameLoop(timestamp = 0) {
+      const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+      lastTime = timestamp;
+
+      // Decrement screen shake timer across all game states
+      if (screenShakeTimer > 0) {
+        screenShakeTimer -= dt;
+        if (screenShakeTimer < 0) screenShakeTimer = 0;
+      }
+
+      // Animate particle explosion during game over
+      if (gameState === 'GAMEOVER') {
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.life -= dt;
+          if (p.life <= 0) {
+            particles.splice(i, 1);
+          }
+        }
+      }
+
+      update(dt);
+      draw();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    requestAnimationFrame(gameLoop);
+  </script>
+
+
+
+
+</body></html>
